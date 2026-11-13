@@ -10,6 +10,24 @@ Type `#case-law` followed by a space and it becomes:
 
 with the cursor inside `[court:: ]`, ready to fill in.
 
+## Why this suite exists
+
+I created this suite of Obsidian plugins and the DoomEsque theme so that I can be 100 percent certain there are no network calls or traffic: everything runs 100 percent offline, so I can use Obsidian for my notes in open-book law exams.
+
+- Nothing in the suite makes a network request. Every test run checks the source, built bundle and styles with `scripts/offline-audit.mjs`, which fails on any network API (`fetch`, `XMLHttpRequest`, WebSocket, `requestUrl`, ...).
+- Obsidian itself has separate online features. For a fully offline setup, also turn off automatic updates, Sync and Publish, and don't browse community plugins during the exam.
+
+The suite:
+
+- [DoomEsque](https://github.com/blursedperf/obsidian-theme-doomesque) (theme)
+- [DoomEsque Settings](https://github.com/blursedperf/obsidian-doomesque-settings)
+- [Filetypes](https://github.com/blursedperf/obsidian-filetypes-plugin)
+- [Inline Autocomplete](https://github.com/blursedperf/obsidian-inline-autocomplete)
+- **Inline Schema Expander**
+- [Links in New Tabs](https://github.com/blursedperf/obsidian-links-in-new-tabs)
+- [Pomodoro Flashcards](https://github.com/blursedperf/obsidian-pomodoro-flashcards)
+- [Whole-Tree Search](https://github.com/blursedperf/obsidian-whole-tree-search)
+
 ## Features
 
 - **Trigger tags**: Each schema pairs a tag (e.g. `#case-law`) with the text it expands into. The expansion happens when the tag is followed by a space or tab, and only when the tag starts the line or follows whitespace, so `#case-law-notes` or `abc#case-law` never expand.

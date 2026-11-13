@@ -61,18 +61,30 @@ export class InlineSchemaSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	/**
+	 * Builds a settings group (heading + items container) with the same structure Obsidian 1.13+ uses
+	 * for its own groups, so the tab looks like every other settings tab in any theme.
+	 */
+	private group(parent: HTMLElement): { groupEl: HTMLElement; itemsEl: HTMLElement } {
+		const groupEl = parent.createDiv({ cls: "setting-group" });
+		const itemsEl = groupEl.createDiv({ cls: "setting-items" });
+		return { groupEl, itemsEl };
+	}
+
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl)
+		const intro = this.group(containerEl);
+		new Setting(intro.groupEl)
 			.setName("Schemas")
 			.setDesc(
 				"Tags that expand into inline field templates when followed by a space or tab. Set the cursor offset to 0 to place the cursor in the first empty field, e.g. [field:: ]."
 			)
 			.setHeading();
+		intro.groupEl.prepend(intro.groupEl.lastElementChild as HTMLElement);
 
-		new Setting(containerEl)
+		new Setting(intro.itemsEl)
 			.setName("Add new schema")
 			.setDesc("Add a new trigger tag and inline expansion template.")
 			.addButton((btn) =>
@@ -92,20 +104,17 @@ export class InlineSchemaSettingTab extends PluginSettingTab {
 			);
 
 		this.plugin.settings.schemas.forEach((schema, index) => {
-			const groupEl = containerEl.createDiv({
-				cls: "inline-schema-setting-group",
-			});
+			const { groupEl, itemsEl } = this.group(containerEl);
 
-			new Setting(groupEl)
-				.setName(`Schema #${index + 1}`)
+			const heading = new Setting(groupEl)
+				.setName(`Schema ${index + 1}`)
+				.setHeading()
 				.addExtraButton((btn) =>
 					btn
 						.setIcon("reset")
 						.setTooltip("Set the cursor offset from the first empty field")
 						.onClick(async () => {
-							schema.cursorOffset = computeOffsetFromFirstBracket(
-								schema.expansionText
-							);
+							schema.cursorOffset = computeOffsetFromFirstBracket(schema.expansionText);
 							await this.plugin.saveSettings();
 							this.display();
 						})
@@ -120,8 +129,9 @@ export class InlineSchemaSettingTab extends PluginSettingTab {
 							this.display();
 						})
 				);
+			groupEl.prepend(heading.settingEl);
 
-			new Setting(groupEl)
+			new Setting(itemsEl)
 				.setName("Trigger tag")
 				.setDesc("Tag that triggers the expansion when followed by a space or tab, e.g. #case-law.")
 				.addText((text) =>
@@ -134,25 +144,29 @@ export class InlineSchemaSettingTab extends PluginSettingTab {
 						})
 				);
 
-			new Setting(groupEl)
+			// The template is usually longer than a text field: give it the full row width.
+			new Setting(itemsEl)
 				.setName("Expansion text")
 				.setDesc("Full inline schema to insert, e.g. #case-law [court:: ] [year:: ] [ratio:: ].")
-				.addText((text) =>
+				.setClass("inline-schema-expansion")
+				.addTextArea((text) => {
 					text
 						.setPlaceholder("#case-law [court:: ] [year:: ] [ratio:: ]")
 						.setValue(schema.expansionText)
 						.onChange((value) => {
 							schema.expansionText = value;
 							this.plugin.requestSave();
-						})
-				);
+						});
+					text.inputEl.rows = 2;
+					text.inputEl.spellcheck = false;
+				});
 
-			new Setting(groupEl)
+			new Setting(itemsEl)
 				.setName("Cursor offset")
 				.setDesc(
 					"Characters back from the end of the expansion text to place the cursor (0 = the first empty field)."
 				)
-				.addText((text) =>
+				.addText((text) => {
 					text
 						.setPlaceholder("22")
 						.setValue(String(schema.cursorOffset))
@@ -160,8 +174,12 @@ export class InlineSchemaSettingTab extends PluginSettingTab {
 							const parsed = parseInt(value, 10);
 							schema.cursorOffset = Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
 							this.plugin.requestSave();
-						})
-				);
+						});
+					text.inputEl.type = "number";
+					text.inputEl.min = "0";
+					text.inputEl.addClass("inline-schema-offset");
+				});
 		});
 	}
+
 }

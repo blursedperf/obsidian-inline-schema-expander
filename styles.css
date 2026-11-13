@@ -1,12 +1,26 @@
-.inline-schema-setting-group {
-	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--radius-m);
-	padding: 12px;
-	margin-bottom: 12px;
-	background-color: var(--background-secondary-alt);
+/* Expansion text takes the full row width below its label (templates are longer than a text field). */
+.setting-item.inline-schema-expansion {
+	flex-wrap: wrap;
+	row-gap: var(--size-4-2, 8px);
 }
 
-.inline-schema-setting-group .setting-item:first-child {
-	border-top: none;
-	padding-top: 0;
+.setting-item.inline-schema-expansion .setting-item-info {
+	flex: 1 1 100%;
+}
+
+.setting-item.inline-schema-expansion .setting-item-control {
+	flex: 1 1 100%;
+}
+
+.setting-item.inline-schema-expansion textarea {
+	width: 100%;
+	min-height: 3.2em;
+	resize: vertical;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-small);
+}
+
+.inline-schema-offset {
+	width: 6em;
+	text-align: end;
 }
