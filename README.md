@@ -26,6 +26,7 @@ The suite:
 - **Inline Schema Expander**
 - [Links in New Tabs](https://github.com/blursedperf/obsidian-links-in-new-tabs)
 - [Pomodoro Flashcards](https://github.com/blursedperf/obsidian-pomodoro-flashcards)
+- [Task Docket](https://github.com/blursedperf/obsidian-task-docket)
 - [Whole-Tree Search](https://github.com/blursedperf/obsidian-whole-tree-search)
 
 ## Features
