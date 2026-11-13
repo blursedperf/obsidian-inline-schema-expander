@@ -1,7 +1,7 @@
 {
 	"id": "inline-schema-expander",
 	"name": "Inline Schema Expander",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"minAppVersion": "1.5.0",
 	"description": "Expand trigger tags such as #case-law into inline field templates, with the cursor placed in the first field.",
 	"author": "blursedperf",
