@@ -1,0 +1,31 @@
+{
+	"name": "obsidian-inline-schema-expander",
+	"version": "1.0.0",
+	"description": "Expand trigger tags such as #case-law into inline field templates, with the cursor placed in the first field.",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"test": "esbuild test/expander.test.ts --bundle --platform=node --format=cjs | node && node scripts/offline-audit.mjs"
+	},
+	"keywords": [
+		"obsidian",
+		"plugin",
+		"codemirror",
+		"schema",
+		"logseq",
+		"tags-as-classes",
+		"inline-fields"
+	],
+	"author": "blursedperf",
+	"license": "MIT",
+	"devDependencies": {
+		"@codemirror/state": "^6.4.1",
+		"@codemirror/view": "^6.26.3",
+		"@types/node": "^20.11.0",
+		"esbuild": "0.21.5",
+		"obsidian": "^1.5.7",
+		"tslib": "2.6.2",
+		"typescript": "5.4.5"
+	}
+}

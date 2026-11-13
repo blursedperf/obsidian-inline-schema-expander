@@ -1,0 +1,12 @@
+.inline-schema-setting-group {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	padding: 12px;
+	margin-bottom: 12px;
+	background-color: var(--background-secondary-alt);
+}
+
+.inline-schema-setting-group .setting-item:first-child {
+	border-top: none;
+	padding-top: 0;
+}
