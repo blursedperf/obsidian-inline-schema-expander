@@ -1,26 +1,283 @@
-/* Expansion text takes the full row width below its label (templates are longer than a text field). */
+/* Inline Schema Expander. Uses Obsidian's variables only, so it follows any theme. */
+
+/* ---------- settings ---------- */
+
+/* Template and citation text take the full row width below their label. */
 .setting-item.inline-schema-expansion {
 	flex-wrap: wrap;
 	row-gap: var(--size-4-2, 8px);
 }
 
-.setting-item.inline-schema-expansion .setting-item-info {
-	flex: 1 1 100%;
-}
-
+.setting-item.inline-schema-expansion .setting-item-info,
 .setting-item.inline-schema-expansion .setting-item-control {
 	flex: 1 1 100%;
 }
 
-.setting-item.inline-schema-expansion textarea {
+.setting-item.inline-schema-expansion :is(textarea, input[type="text"]) {
 	width: 100%;
-	min-height: 3.2em;
-	resize: vertical;
 	font-family: var(--font-monospace);
 	font-size: var(--font-ui-small);
 }
 
-.inline-schema-offset {
-	width: 6em;
-	text-align: end;
+.setting-item.inline-schema-expansion textarea {
+	min-height: 3.2em;
+	resize: vertical;
+}
+
+.ise-picker-fields {
+	color: var(--text-muted);
+}
+
+/* ---------- fields in the editor ---------- */
+
+.ise-field.is-empty {
+	border-radius: var(--radius-s);
+	background-color: var(--background-modifier-hover);
+	color: var(--text-muted);
+}
+
+.ise-field.is-required {
+	box-shadow: inset 0 -1px 0 var(--text-warning);
+}
+
+.ise-missing-field {
+	display: inline-flex;
+	align-items: center;
+	height: auto;
+	margin-inline-start: 0.4em;
+	padding: 0 0.45em;
+	border: var(--border-width, 1px) dashed var(--text-warning);
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-warning);
+	font-family: var(--font-interface);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.5;
+	vertical-align: baseline;
+	cursor: var(--cursor);
+}
+
+.ise-missing-field:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+/* ---------- finder ---------- */
+
+.ise-finder-item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.ise-finder-top {
+	display: flex;
+	align-items: baseline;
+	gap: var(--size-4-2, 8px);
+	min-width: 0;
+}
+
+.ise-finder-name {
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ise-finder-meta {
+	flex-shrink: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-variant-numeric: tabular-nums;
+}
+
+.ise-finder-tag {
+	flex-shrink: 0;
+	margin-inline-start: auto;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.ise-finder-detail {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	line-height: var(--line-height-tight, 1.3);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.ise-finder-key {
+	color: var(--text-faint);
+}
+
+.ise-finder-path {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ---------- table view ---------- */
+
+.ise-table-view {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+}
+
+.ise-table-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-2, 8px);
+	padding: var(--size-4-3, 12px) var(--size-4-4, 16px);
+	border-bottom: var(--border-width, 1px) solid var(--background-modifier-border);
+}
+
+.ise-table-search {
+	flex: 1 1 14em;
+	min-width: 10em;
+}
+
+.ise-table-search input {
+	width: 100%;
+}
+
+.ise-table-count {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	font-variant-numeric: tabular-nums;
+}
+
+.ise-table-scroll {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	padding: 0 var(--size-4-4, 16px) var(--size-4-6, 24px);
+}
+
+.ise-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--font-ui-small);
+}
+
+.ise-table th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 0;
+	background-color: var(--background-primary);
+	border-bottom: var(--border-width, 1px) solid var(--background-modifier-border);
+	text-align: start;
+	white-space: nowrap;
+}
+
+.ise-table .ise-th-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	width: 100%;
+	height: auto;
+	padding: var(--size-4-2, 8px) var(--size-2-3, 6px);
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	border-radius: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	justify-content: flex-start;
+}
+
+.ise-table .ise-th-button:hover {
+	color: var(--text-normal);
+	background-color: var(--background-modifier-hover);
+}
+
+.ise-table th[aria-sort] .ise-th-button {
+	color: var(--text-normal);
+}
+
+.ise-sort-icon {
+	display: inline-flex;
+	--icon-size: var(--icon-xs, 14px);
+}
+
+.ise-table td {
+	padding: var(--size-4-2, 8px) var(--size-2-3, 6px);
+	border-bottom: var(--border-width, 1px) solid var(--background-modifier-border);
+	vertical-align: top;
+}
+
+.ise-table tbody tr:hover td {
+	background-color: var(--background-modifier-hover);
+}
+
+.ise-entry-link {
+	font-weight: var(--font-semibold);
+	color: var(--link-color);
+	text-decoration: none;
+}
+
+.ise-entry-link:hover,
+.ise-note-link:hover {
+	text-decoration: underline;
+}
+
+.ise-note-link {
+	color: var(--text-muted);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.ise-cell {
+	min-width: 5em;
+	max-width: 28em;
+	cursor: text;
+}
+
+.ise-cell:focus-visible {
+	outline: 2px solid var(--background-modifier-border-focus);
+	outline-offset: -2px;
+}
+
+.ise-cell-value {
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+}
+
+.ise-cell.is-empty .ise-cell-value {
+	color: var(--text-faint);
+}
+
+.ise-cell.is-editing {
+	padding: 2px;
+}
+
+.ise-cell-input {
+	width: 100%;
+	min-width: 8em;
+}
+
+.ise-table-empty {
+	padding: var(--size-4-8, 32px) var(--size-4-4, 16px);
+	text-align: center;
+}
+
+.ise-table-empty-title {
+	font-weight: var(--font-semibold);
+	margin-bottom: var(--size-2-3, 6px);
+}
+
+.ise-table-empty-desc {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
 }

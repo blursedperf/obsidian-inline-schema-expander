@@ -1,181 +1,205 @@
+/**
+ * The editor side: expanding trigger tags, and Tab / Shift+Tab between a schema line's fields.
+ */
 import {
 	Annotation,
 	EditorSelection,
+	EditorState,
 	Extension,
+	Prec,
 	Transaction,
 	TransactionSpec,
 } from "@codemirror/state";
-import { EditorView, ViewUpdate } from "@codemirror/view";
-
-export interface SchemaRule {
-	triggerTag: string;
-	expansionText: string;
-	/**
-	 * Number of characters back from the end of `expansionText` where the cursor
-	 * should be placed. If 0 (or negative), the first empty bracket `]` is matched via regex.
-	 */
-	cursorOffset: number;
-}
-
-export const DEFAULT_SCHEMAS: SchemaRule[] = [
-	{
-		triggerTag: "#case-law",
-		expansionText: "#case-law [court:: ] [year:: ] [ratio:: ]",
-		cursorOffset: 22,
-	},
-];
-
-/** Keep only well-formed schemas from saved data. */
-export function loadSchemas(raw: unknown): SchemaRule[] | null {
-	if (!raw || typeof raw !== "object" || !Array.isArray((raw as { schemas?: unknown }).schemas)) {
-		return null;
-	}
-	return ((raw as { schemas: unknown[] }).schemas)
-		.filter((s): s is SchemaRule => {
-			const r = s as Partial<SchemaRule> | null;
-			return (
-				!!r &&
-				typeof r.triggerTag === "string" &&
-				typeof r.expansionText === "string" &&
-				typeof r.cursorOffset === "number"
-			);
-		})
-		.map((s) => ({ triggerTag: s.triggerTag, expansionText: s.expansionText, cursorOffset: s.cursorOffset }));
-}
+import { EditorView, keymap, ViewUpdate } from "@codemirror/view";
+import { endsWithTag, fieldAt, findTag, InlineField, normalizeTag, parseFields } from "./fields";
+import type { SchemaRule } from "./schema";
+import { firstFieldSelection, renderTemplate, TemplateContext, templateFields } from "./template";
 
 export const schemaExpansionAnnotation = Annotation.define<boolean>();
 
-const FIRST_EMPTY_BRACKET_REGEX = /\[[^\]]*?\s*\]/;
-const FIRST_CLOSING_BRACKET_REGEX = /\]/;
+/** Completions and pastes longer than this are never treated as typing a tag. */
+const MAX_COMPLETION_LENGTH = 100;
 
-/**
- * Computes the number of characters back from the end of `expansionText`
- * to position the cursor right before the first `]`.
- */
-export function computeOffsetFromFirstBracket(expansionText: string): number {
-	const emptyFieldMatch = FIRST_EMPTY_BRACKET_REGEX.exec(expansionText);
-	if (emptyFieldMatch && emptyFieldMatch.index !== undefined) {
-		const bracketIndex = emptyFieldMatch.index + emptyFieldMatch[0].length - 1;
-		return expansionText.length - bracketIndex;
-	}
+export interface ExpanderOptions {
+	getSchemas: () => SchemaRule[];
+	/** Date, time and note title for `{{date}}`, `{{time}}` and `{{title}}`. */
+	getContext: (state: EditorState) => TemplateContext;
+	tabNavigation: () => boolean;
+}
 
-	const fallbackMatch = FIRST_CLOSING_BRACKET_REGEX.exec(expansionText);
-	if (fallbackMatch && fallbackMatch.index !== undefined) {
-		return expansionText.length - fallbackMatch.index;
-	}
+function schemaKeys(rule: SchemaRule): Set<string> {
+	return new Set(templateFields(rule.expansionText).map((f) => f.keyLower));
+}
 
-	return 0;
+/** Already expanded: the rest of the line holds one of the schema's fields. */
+function alreadyExpanded(rest: string, rule: SchemaRule): boolean {
+	const keys = schemaKeys(rule);
+	return parseFields(rest).some((f) => keys.has(f.keyLower));
+}
+
+/** Replaces `from..to` (the tag and what follows it) with the rendered template. */
+function expansionSpec(from: number, to: number, rule: SchemaRule, ctx: TemplateContext): TransactionSpec {
+	const text = renderTemplate(rule.expansionText, ctx);
+	const tagAt = Math.max(0, findTag(text, rule.triggerTag));
+	const sel = firstFieldSelection(text, tagAt);
+	return {
+		changes: { from, to, insert: text },
+		selection: EditorSelection.single(from + sel.anchor, from + sel.head),
+		annotations: [schemaExpansionAnnotation.of(true), Transaction.userEvent.of("input.complete")],
+		scrollIntoView: true,
+	};
 }
 
 /**
- * Resolves the absolute document offset where the cursor should snap after schema expansion.
- * Uses `rule.cursorOffset` (characters back from the end of `expansionText`) when > 0,
- * or falls back to regex detection of the first empty bracket `]`.
- */
-export function resolveCursorAnchor(tagStart: number, rule: SchemaRule): number {
-	const len = rule.expansionText.length;
-
-	if (rule.cursorOffset > 0 && rule.cursorOffset <= len) {
-		return tagStart + (len - rule.cursorOffset);
-	}
-
-	const autoOffsetFromEnd = computeOffsetFromFirstBracket(rule.expansionText);
-	if (autoOffsetFromEnd > 0 && autoOffsetFromEnd <= len) {
-		return tagStart + (len - autoOffsetFromEnd);
-	}
-
-	return tagStart + len;
-}
-
-/**
- * Inspects a document change where a trigger character (Space or Tab) was just inserted.
- * If the text immediately preceding the trigger character matches a configured `SchemaRule`,
- * returns an atomic `TransactionSpec` that replaces the tag + trigger with `expansionText`
- * and snaps the cursor into the target field.
+ * After a document change, the expansion it calls for (if any). A typed space or tab after a tag
+ * expands it, as does a completion or paste that ends with a tag (Obsidian's tag suggestions, Inline
+ * Autocomplete), optionally followed by one space.
  */
 export function buildExpansionTransaction(
 	update: ViewUpdate,
-	getSchemas: () => SchemaRule[]
+	getSchemas: () => SchemaRule[],
+	getContext: (state: EditorState) => TemplateContext = () => ({ date: "", time: "", title: "" })
 ): TransactionSpec | null {
-	if (!update.docChanged) {
-		return null;
-	}
-
+	if (!update.docChanged) return null;
 	for (const tr of update.transactions) {
-		if (tr.annotation(schemaExpansionAnnotation)) {
-			return null;
-		}
-		if (tr.isUserEvent("undo") || tr.isUserEvent("redo")) {
-			return null;
-		}
+		if (tr.annotation(schemaExpansionAnnotation)) return null;
+		if (tr.isUserEvent("undo") || tr.isUserEvent("redo")) return null;
 	}
-
 	const schemas = getSchemas();
-	if (!schemas || schemas.length === 0) {
-		return null;
-	}
+	if (!schemas || schemas.length === 0) return null;
 
-	let expansionSpec: TransactionSpec | null = null;
-
-	update.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
-		if (expansionSpec !== null) return;
-
-		// Only trigger on a single inserted Space or Tab character
-		if (fromA !== toA || inserted.length !== 1) return;
-		const insertedChar = inserted.toString();
-		if (insertedChar !== " " && insertedChar !== "\t") return;
-
+	let spec: TransactionSpec | null = null;
+	update.changes.iterChanges((_fromA, _toA, fromB, toB, inserted) => {
+		if (spec) return;
+		const text = inserted.toString();
+		if (!text || text.length > MAX_COMPLETION_LENGTH || text.includes("\n")) return;
 		const line = update.state.doc.lineAt(toB);
-		const offsetBeforeTrigger = fromB - line.from;
-		const textBeforeTrigger = line.text.slice(0, offsetBeforeTrigger);
+		const before = line.text.slice(0, toB - line.from);
+		const rest = line.text.slice(toB - line.from);
+		const typedTrigger = text === " " || text === "\t";
+		if (!typedTrigger && text.length < 2) return;
 
-		for (const rawRule of schemas) {
-			const triggerTag = rawRule.triggerTag.trim();
-			const expansionText = rawRule.expansionText;
-			if (!triggerTag || !expansionText) continue;
-
-			if (!textBeforeTrigger.endsWith(triggerTag)) continue;
-
-			// Ensure the tag starts at the beginning of the line or after whitespace
-			const tagStartInLine = offsetBeforeTrigger - triggerTag.length;
-			if (tagStartInLine > 0 && !/\s/.test(textBeforeTrigger[tagStartInLine - 1])) {
-				continue;
-			}
-
-			const tagStart = line.from + tagStartInLine;
-			const replaceTo = toB;
-			const cursorAnchor = resolveCursorAnchor(tagStart, rawRule);
-
-			expansionSpec = {
-				changes: {
-					from: tagStart,
-					to: replaceTo,
-					insert: expansionText,
-				},
-				selection: EditorSelection.cursor(cursorAnchor),
-				annotations: [
-					schemaExpansionAnnotation.of(true),
-					Transaction.userEvent.of("input.complete"),
-				],
-			};
+		// The text that must end with the tag: without the typed space, or one trailing space.
+		const head = typedTrigger ? before.slice(0, -1) : before.replace(/[ \t]$/, "");
+		for (const rule of schemas) {
+			const tag = normalizeTag(rule.triggerTag);
+			if (!tag || !rule.expansionText || !endsWithTag(head, tag)) continue;
+			const tagStart = line.from + head.length - tag.length;
+			// A completion counts only if it wrote (part of) the tag, not text somewhere after it.
+			if (!typedTrigger && tagStart + tag.length <= fromB) continue;
+			if (alreadyExpanded(rest, rule)) continue;
+			spec = expansionSpec(tagStart, toB, rule, getContext(update.state));
 			break;
 		}
 	});
+	return spec;
+}
 
-	return expansionSpec;
+/** Tab right after a tag: expand it (Obsidian would otherwise indent a list line). */
+export function expandBeforeCursor(state: EditorState, schemas: SchemaRule[], ctx: TemplateContext): TransactionSpec | null {
+	const sel = state.selection.main;
+	if (!sel.empty) return null;
+	const line = state.doc.lineAt(sel.head);
+	const before = line.text.slice(0, sel.head - line.from);
+	const rest = line.text.slice(sel.head - line.from);
+	for (const rule of schemas) {
+		const tag = normalizeTag(rule.triggerTag);
+		if (!tag || !rule.expansionText || !endsWithTag(before, tag) || alreadyExpanded(rest, rule)) continue;
+		return expansionSpec(sel.head - tag.length, sel.head, rule, ctx);
+	}
+	return null;
+}
+
+/** The schema whose tag appears first on a line, and where. */
+export function schemaOnLine(text: string, schemas: SchemaRule[]): { rule: SchemaRule; tagIndex: number } | null {
+	let best: { rule: SchemaRule; tagIndex: number } | null = null;
+	for (const rule of schemas) {
+		const i = findTag(text, rule.triggerTag);
+		if (i !== -1 && (!best || i < best.tagIndex)) best = { rule, tagIndex: i };
+	}
+	return best;
+}
+
+function target(f: InlineField): { from: number; to: number } {
+	return { from: f.valueFrom, to: f.valueTo };
 }
 
 /**
- * CodeMirror 6 extension that monitors editor transactions and expands
- * matched trigger tags into inline schemas on Space or Tab.
+ * Tab: the next empty field on a schema line (wrapping to the first), skipping the one the cursor
+ * is in. Null when no empty field is left, so Tab does what it normally does.
  */
-export function createSchemaExpanderExtension(
-	getSchemas: () => SchemaRule[]
-): Extension {
-	return EditorView.updateListener.of((update: ViewUpdate) => {
-		const spec = buildExpansionTransaction(update, getSchemas);
-		if (spec) {
-			update.view.dispatch(spec);
-		}
+export function nextFieldTarget(lineText: string, cursor: number, schemas: SchemaRule[]): { from: number; to: number } | null {
+	const found = schemaOnLine(lineText, schemas);
+	if (!found) return null;
+	const fields = parseFields(lineText, found.tagIndex);
+	const current = fieldAt(fields, cursor);
+	const empty = fields.filter((f) => !f.value && f !== current);
+	const next = empty.find((f) => f.from >= cursor) ?? empty[0];
+	return next ? target(next) : null;
+}
+
+/** Shift+Tab: the field before the one the cursor is in (or the last one before the cursor). */
+export function previousFieldTarget(lineText: string, cursor: number, schemas: SchemaRule[]): { from: number; to: number } | null {
+	const found = schemaOnLine(lineText, schemas);
+	if (!found) return null;
+	const fields = parseFields(lineText, found.tagIndex);
+	const current = fieldAt(fields, cursor);
+	if (current) {
+		const i = fields.indexOf(current);
+		return i > 0 ? target(fields[i - 1]) : null;
+	}
+	const before = fields.filter((f) => f.to <= cursor);
+	return before.length > 0 ? target(before[before.length - 1]) : null;
+}
+
+function moveTo(view: EditorView, lineFrom: number, t: { from: number; to: number }): boolean {
+	view.dispatch({
+		selection: EditorSelection.single(lineFrom + t.from, lineFrom + t.to),
+		scrollIntoView: true,
+		// No "select" user event: Obsidian nudges such selections past a closing bracket.
 	});
+	return true;
+}
+
+/**
+ * CodeMirror extension: expands tags as they are typed or completed, and binds Tab / Shift+Tab.
+ * The keymap sits below Inline Autocomplete's (Prec.highest), so Tab still accepts its ghost text.
+ */
+export function createSchemaExpanderExtension(opts: ExpanderOptions): Extension {
+	const listener = EditorView.updateListener.of((update: ViewUpdate) => {
+		const spec = buildExpansionTransaction(update, opts.getSchemas, opts.getContext);
+		if (spec) update.view.dispatch(spec);
+	});
+
+	const keys = Prec.high(
+		keymap.of([
+			{
+				key: "Tab",
+				run: (view) => {
+					const schemas = opts.getSchemas();
+					const spec = expandBeforeCursor(view.state, schemas, opts.getContext(view.state));
+					if (spec) {
+						view.dispatch(spec);
+						return true;
+					}
+					if (!opts.tabNavigation()) return false;
+					const sel = view.state.selection.main;
+					const line = view.state.doc.lineAt(sel.head);
+					const t = nextFieldTarget(line.text, sel.head - line.from, schemas);
+					return t ? moveTo(view, line.from, t) : false;
+				},
+			},
+			{
+				key: "Shift-Tab",
+				run: (view) => {
+					if (!opts.tabNavigation()) return false;
+					const sel = view.state.selection.main;
+					const line = view.state.doc.lineAt(sel.head);
+					const t = previousFieldTarget(line.text, sel.head - line.from, opts.getSchemas());
+					return t ? moveTo(view, line.from, t) : false;
+				},
+			},
+		])
+	);
+	return [listener, keys];
 }
