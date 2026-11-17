@@ -165,7 +165,8 @@ export default class InlineSchemaExpanderPlugin extends Plugin {
 		const existing = this.app.workspace.getLeavesOfType(TABLE_VIEW)[0];
 		const leaf = existing ?? this.app.workspace.getLeaf("tab");
 		if (!existing) await leaf.setViewState({ type: TABLE_VIEW, active: true });
-		await this.app.workspace.revealLeaf(leaf);
+		// setActiveLeaf rather than revealLeaf, which only returns a Promise from Obsidian 1.7.2.
+		this.app.workspace.setActiveLeaf(leaf, { focus: true });
 	}
 
 	async openEntry(entry: SchemaEntry, newTab: PaneType | boolean): Promise<void> {

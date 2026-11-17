@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-inline-schema-expander",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"description": "Expand trigger tags such as #case-law into inline field templates, with the cursor placed in the first field.",
 	"main": "main.js",
 	"scripts": {
