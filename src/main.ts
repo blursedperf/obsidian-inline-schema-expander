@@ -402,7 +402,7 @@ export class InlineSchemaSettingTab extends PluginSettingTab {
 		if (requireApiVersion("1.13.0")) {
 			this.update();
 		} else {
-			this.display();
+			this.renderLegacy();
 		}
 	}
 
@@ -621,8 +621,13 @@ export class InlineSchemaSettingTab extends PluginSettingTab {
 	// ── Legacy fallback (Obsidian < 1.13) ────────────────────────────────────
 	// Obsidian 1.13+ renders getSettingDefinitions() itself and never calls this.
 	// Older versions call display(), so render the same definitions imperatively,
-	// with the same group structure Obsidian uses.
+	// with the same group structure Obsidian uses. The plugin's own code calls renderLegacy(),
+	// never the deprecated display().
 	display(): void {
+		this.renderLegacy();
+	}
+
+	private renderLegacy(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 

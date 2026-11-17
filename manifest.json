@@ -1,7 +1,7 @@
 {
 	"id": "inline-schema-expander",
 	"name": "Inline Schema Expander",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"minAppVersion": "1.5.0",
 	"description": "Expand tags such as #case-law into inline fields you fill in with Tab, then search, cite, tabulate and promote those entries.",
 	"author": "blursedperf",
